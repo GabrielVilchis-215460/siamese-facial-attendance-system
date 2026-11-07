@@ -1,0 +1,56 @@
+name: attendance-system
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      args:
+        # eso cambiaria a "true" cuando mi modelo de la red siamesa este listo, para ello, instalaria PyTorch CPU
+        WITH_TORCH: "false"
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # UMBRAL_DISTANCIA: ${UMBRAL_DISTANCIA:-0.8}
+      # TOLERANCIA_MINUTOS: ${TOLERANCIA_MINUTOS:-10}
+      # ANTIREBOTE_SEGUNDOS: ${ANTIREBOTE_SEGUNDOS:-60}
+      ZONA_HORARIA: ${ZONA_HORARIA:-America/Ciudad_Juarez}
+      # MODELO_PATH: /app/models/siamesa.pt
+    # volumes:
+      # Los pesos entrenados se montan en solo lectura
+      #- ./backend/models:/app/models:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+      args:
+        CERT_SAN: ${CERT_SAN:-DNS:localhost,IP:127.0.0.1}
+    restart: unless-stopped
+    environment:
+      HTTPS_PORT: ${HTTPS_PORT:-8443}
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
