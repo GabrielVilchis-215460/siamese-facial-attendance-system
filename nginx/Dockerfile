@@ -21,5 +21,5 @@ RUN mkdir -p /etc/nginx/certs && \
       -subj "/CN=localhost" \
       -addext "subjectAltName=${CERT_SAN}"
 
-COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
+COPY nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=frontend /app/dist /usr/share/nginx/html
